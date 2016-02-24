@@ -1,0 +1,7 @@
+# Google App Engine generated folder
+appengine-generated/
+.DS_Store
+*.swp
+*.pyc
+node_modules/
+secret.json

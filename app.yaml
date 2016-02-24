@@ -1,0 +1,35 @@
+application: sportsfeed
+version: 1
+runtime: python27
+api_version: 1
+threadsafe: true
+
+handlers:
+- url: /css
+  static_dir: css
+
+- url: /js
+  static_dir: js
+
+- url: /assets
+  static_dir: assets
+
+- url: /favicon\.ico
+  static_files: assets/favicon.ico
+  upload: assets/favicon\.ico
+
+- url: /.*
+  script: main.app
+#  secure: always
+
+libraries:
+- name: jinja2
+  version: latest
+
+skip_files:
+- ^node_modules/.*$
+- ^\.git/.*$
+- ^package\.json$
+- ^(.*/)?.*\.py[co]$
+- ^Gruntfile\.js$
+- ^(.*/)?\..*$
