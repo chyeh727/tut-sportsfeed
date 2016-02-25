@@ -1,0 +1,4 @@
+cron:
+- description: update articles to database
+  url: /tasks/update
+  schedule: every 5 mins

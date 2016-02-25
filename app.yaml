@@ -5,6 +5,10 @@ api_version: 1
 threadsafe: true
 
 handlers:
+- url: /tasks/update
+  script: main.app
+  login: admin
+
 - url: /css
   static_dir: css
 

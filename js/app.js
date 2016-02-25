@@ -6,11 +6,10 @@ document.addEventListener('DOMContentLoaded', function() {
     var addArticle = function(article, prepend) {
         // Make the article. This is our article template.
         var a = document.createElement('div');
-        var hasPic = article.multimedia.length > 0;
         a.className = 'article';
         var s = '';
-        if (hasPic) {
-            s += '<img class="np" src="http://www.nytimes.com/' + article.multimedia[1].url + '" alt="news">';
+        if (article.imgurl) {
+            s += '<img class="np" src="http://www.nytimes.com/' + article.imgurl + '" alt="news">';
         }
         if (article.subsection_name) {
             s += '<p class="meta"><span class="subsection">' + article.subsection_name + '</span></p>';
@@ -26,34 +25,81 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
     
-    var fetchData = function() {
+    var smallAid = null,
+        bigAid = null,
+        more = true;
+    var fetchingData = false;
+    
+    var fetchData = function(isUpdate) {
+        // We only allow one fetch at a time
+        if (fetchingData) {
+            return;
+        }
+        fetchingData = true;
+        
         // Do the usual XHR stuff
         var req = new XMLHttpRequest();
-        req.open('GET', '/articles');
+        var url = '/articles';
+        if (!isUpdate && smallAid !== null) {
+            url += '?s=' + smallAid;
+        } else if (isUpdate) {
+            url += '?b=' + bigAid;
+        }
+        req.open('GET', url);
         loadingAnimation.classList.remove('hidden');
 
         req.onload = function() {
             loadingAnimation.classList.add('hidden');
             if (req.status == 200) {
-                var dataItems = JSON.parse(req.response);
+                var resp = JSON.parse(req.response);
+                var dataItems = resp.data;
+                if (resp.more !== undefined) {
+                    more = resp.more;
+                }
+                
+                // Record the date range we have on the view
+                if (dataItems.length) {
+                    if (bigAid === null || isUpdate) {
+                        bigAid = dataItems[0].aid;
+                    }
+                    if (!isUpdate) {
+                        smallAid = dataItems[dataItems.length - 1].aid;
+                    }                    
+                }
+                                
                 for (var i = 0, len = dataItems.length; i < len; i++) {
                     addArticle(dataItems[i]);
                 }
             }
             else {
-                console.log(req.statusText);
+                //console.log(req.statusText);
             }
+            fetchingData = false;
         };
         
         // Handle network errors
         req.onerror = function() {
             loadingAnimation.classList.add('hidden');
-            console.log("Network Error");
+            fetchingData = false;
+            //console.log("Network Error");
         };
         
         // Make the request
         req.send();
     };
     
-    fetchData();    
+    fetchData();
+    
+    window.onscroll = function() {
+        if (more) {
+            var contentHeight = articleContainer.offsetHeight;
+            var yOffset = window.pageYOffset;
+            var y = yOffset + window.innerHeight;
+            if (y >= contentHeight) {
+                fetchData();
+            }            
+        }
+
+    };
+
 });
