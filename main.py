@@ -98,6 +98,29 @@ class Article(ndb.Model):
     def make_ancestor_query(cls, ancestor_key):
         return cls.query(ancestor=ancestor_key).order(-cls.aid)
 
+    
+def get_memcache_key(s=None, b=None, n=NITEMS_PER_FETCH):
+    return '|'.join([str(s), str(b), str(n)])
+
+
+def fetch_articles(s=None, b=None, n=NITEMS_PER_FETCH):
+    """Checks if the requested data is in the cache. If so, return it;
+    otherwise, hit the database and cache the results."""
+    cachekey = get_memcache_key(s, b, n)
+    results = memcache.get(cachekey)
+    # Cache miss. Time to hit the database.
+    if not results:
+        q = Article.make_ancestor_query(ANCESTOR_KEY)
+        if s is not None:
+            q = q.filter(Article.aid < s)
+        elif b is not None:
+            q = q.filter(Article.aid > b)
+        results = [make_article_json(x) for x in q.fetch(n)]
+        # We do not want to cache results for forward updates for now.
+        if b is None:
+            memcache.set(cachekey, results)
+    return results
+
 
 class MainPage(webapp2.RequestHandler):
     def get(self):
@@ -107,8 +130,7 @@ class MainPage(webapp2.RequestHandler):
 
         
 class LoadArticlesHandler(webapp2.RequestHandler):
-    def get(self):
-        q = Article.make_ancestor_query(ANCESTOR_KEY)
+    def get(self):        
         s = self.request.get('s')
         b = self.request.get('b')
         if len(s):
@@ -118,26 +140,28 @@ class LoadArticlesHandler(webapp2.RequestHandler):
                 self.response.set_status(
                         code=400, 
                         message='Invalid parameters.')
-                return
-            q = q.filter(Article.aid < s)
-        if len(b):
+                return            
+            articles = fetch_articles(s=s)
+        elif len(b):
             try:
                 b = int(b)
             except ValueError:
                 self.response.set_status(
                         code=400, 
                         message='Invalid parameters.')
-                return
-            q = q.filter(Article.aid > b)
-        
-        articles = q.fetch(NITEMS_PER_FETCH)
+                return            
+            articles = fetch_articles(b=b)
+        else:
+            articles = fetch_articles()
+   
         resp = {
-            'data': [make_article_json(x) for x in articles]
+            'data': articles
         }
         if not b and len(resp['data']) < NITEMS_PER_FETCH:
             # there are no more articles to fetch
             resp['more'] = False
-        self.response.headers.add_header('content-type', 'application/json', charset='utf-8')
+        self.response.headers.add_header(
+            'content-type', 'application/json', charset='utf-8')
         self.response.out.write(json.dumps(resp))        
 
 
@@ -160,7 +184,11 @@ class CronUpdateHandler(webapp2.RequestHandler):
                     break
             if repeat_from_idx is not None:
                 articles = articles[:repeat_from_idx]
-        
+
+        # Delete the cached results for initial fetch.
+        if len(articles):
+            memcache.delete(get_memcache_key(), 8)
+                
         # Update the new articles to the data store
         # Make sure we insert the older ones first
         for a in reversed(articles):
@@ -175,8 +203,7 @@ class CronUpdateHandler(webapp2.RequestHandler):
             new_article.aid = n
             new_article.put()
             
-        self.response.out.write('cron jobs ok')
-        
+        self.response.out.write('cron jobs ok')        
 
        
 routes = [    
