@@ -16,7 +16,7 @@ from google.appengine.api import users
 from google.appengine.ext import ndb
 
 
-# Sets up the API key
+# Set up the API key
 fh = open('secret.json', 'rU')
 API_KEY = json.loads(fh.read())['api_key']
 fh.close()
@@ -31,7 +31,9 @@ jinja_env = jinja2.Environment(
 # We give the models an ancestor so they all stay in one entity group.
 # This is the function we use to retrieve that key.
 ANCESTOR_KEY = ndb.Key(u'ArticleAncestor', 'AA')
-NITEMS_PER_FETCH = 5
+
+# How many articles we get each fetch.
+NITEMS_PER_FETCH = 10
 
 
 def get_sports_articles(page=0):
@@ -61,6 +63,7 @@ def get_sports_articles(page=0):
 
 
 def make_article_json(a):
+    """Make an Article object into a dictionary."""
     j = {
         'snippet': a.snippet,
         'aid': a.aid
@@ -73,10 +76,22 @@ def make_article_json(a):
     
 
 class Article(ndb.Model):
+    """This is our data model."""
+    
+    # The id field from NYTimes. We use this to check if there is any
+    # repetition.
     nytid = ndb.StringProperty()
+    
+    # Not exactly a URL. This is the path to the image under NYTimes' domain.
     imgurl = ndb.StringProperty(required=False)
+    
+    # What sport it is. Not guaranteed to be provided.
     subsection_name = ndb.StringProperty(required=False)
+    
     snippet = ndb.TextProperty()
+    
+    # The article ID. We maintain this field so that is saves us a lot of
+    # trouble comparing dates.
     aid = ndb.IntegerProperty()
     
     @classmethod
@@ -162,22 +177,12 @@ class CronUpdateHandler(webapp2.RequestHandler):
             
         self.response.out.write('cron jobs ok')
         
-        
-class AjaxRequestHandlerExample(webapp2.RequestHandler):
-    def get(self):
-        resp = {}
-        ccode = self.request.get('ccode')
-        aid = int(self.request.get('aid'))
-
-        self.response.headers.add_header('content-type', 'application/json', charset='utf-8')
-        self.response.out.write(json.dumps(resp))
 
        
 routes = [    
         webapp2.Route('/', handler=MainPage),
         webapp2.Route('/articles', handler=LoadArticlesHandler),
         webapp2.Route('/tasks/update', handler=CronUpdateHandler),
-        #webapp2.Route('/ajax', handler=AjaxRequestHandlerExample),
         ]
 
 # turn off the debug switch

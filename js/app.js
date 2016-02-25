@@ -99,7 +99,5 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetchData();
             }            
         }
-
     };
-
 });
