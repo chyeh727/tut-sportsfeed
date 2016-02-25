@@ -15,9 +15,3 @@ indexes:
   properties:
   - name: aid
     direction: desc
-
-- kind: Article
-  ancestor: yes
-  properties:
-  - name: time_created
-    direction: desc
